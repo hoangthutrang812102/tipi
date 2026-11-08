@@ -1,0 +1,20 @@
+html[data-cloud]:not([data-cloud-ready]) :is(.app-shell,.modal-backdrop,.skip-link) {
+  display:none!important;
+}
+.cloud-gate {
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+}
+.cloud-gate[hidden] { display:none; }
+.cloud-card { width:min(440px,100%); padding:28px; }
+.cloud-card h1 { font-family:'Playfair Display',serif; font-size:40px; line-height:1.2; margin:0; }
+.cloud-card h2 { font-size:19px; margin:12px 0 20px; }
+.cloud-card .cloud-google { width:100%; margin-top:12px; }
+.cloud-actions { display:flex; gap:8px 16px; flex-wrap:wrap; }
+.cloud-status { color:var(--muted); font-size:14px; overflow-wrap:anywhere; }
+.cloud-status:empty { display:none; }
+.cloud-settings { border-top:1px solid var(--line); margin-top:24px; padding-top:20px; }
+.cloud-settings h3 { margin:16px 0 6px; }
+.cloud-settings .cloud-email { overflow-wrap:anywhere; }

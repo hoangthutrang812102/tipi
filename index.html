@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fbf3f1" />
+    <title>Tipi | Nail & Makeup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="tipi-theme.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#mainContent">Đi đến nội dung chính</a>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark"><span>T</span></div>
+          <div>
+            <p class="eyebrow">STUDIO PLANNER</p>
+            <h1>Tipi</h1>
+          </div>
+        </div>
+
+        <div class="studio-switcher">
+          <div class="studio-icon">✦</div>
+          <div>
+            <span>Không gian làm việc</span>
+            <strong>Nail & Makeup</strong>
+          </div>
+          <button class="icon-button muted" aria-label="Đổi không gian">⌄</button>
+        </div>
+
+        <nav class="main-nav" aria-label="Điều hướng chính">
+          <p class="nav-label">MENU</p>
+          <button class="nav-item active" data-view="overview"><span class="nav-icon">⌂</span><span>Tổng quan</span></button>
+          <button class="nav-item" data-view="calendar"><span class="nav-icon">□</span><span>Lịch hẹn</span><span class="nav-badge">4</span></button>
+          <button class="nav-item" data-view="finance"><span class="nav-icon">◌</span><span>Thu & chi</span></button>
+          <p class="nav-label second">KHÁC</p>
+          <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Cài đặt</span></button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="tip-card">
+            <div class="tip-spark">✦</div>
+            <div><strong>Gợi ý hôm nay</strong><p>Nhớ xác nhận lịch ngày mai trước 20:00 nhé.</p></div>
+          </div>
+          <div class="profile-card">
+            <div class="avatar">TP</div>
+            <div><strong>Thu Phương</strong><span>Chủ tiệm</span></div>
+            <button class="icon-button muted" aria-label="Tài khoản">•••</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="mainContent" tabindex="-1">
+        <header class="topbar">
+          <button class="mobile-menu icon-button" id="mobileMenu" aria-label="Mở menu">☰</button>
+          <div class="breadcrumb"><span id="breadcrumbMain">Tổng quan</span><span>/</span><strong id="breadcrumbSub">Thứ 5, 06 tháng 11, 2026</strong></div>
+          <div class="top-actions">
+            <button class="icon-button notification" aria-label="Thông báo"><span>♧</span><i></i></button>
+            <button class="top-avatar">L</button>
+          </div>
+        </header>
+
+        <section class="view active" id="overviewView">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow rose">Lịch hôm nay</p>
+              <h2>Xin chào, Thu Phương <span class="heading-spark">✦</span></h2>
+              <p class="subheading">Một ngày xinh đẹp để tạo nên những bộ móng thật đặc biệt.</p>
+            </div>
+            <button class="primary-button" id="openBooking"><span>＋</span> Thêm lịch hẹn</button>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card blush">
+              <div class="stat-top"><span>DOANH THU THÁNG NÀY</span><span class="stat-icon">↗</span></div>
+              <div class="stat-value" id="monthRevenue">18.450.000 <small>₫</small></div>
+              <div class="stat-foot"><span class="positive">↗ 12,8%</span><span>so với tháng trước</span></div>
+            </article>
+            <article class="stat-card cream">
+              <div class="stat-top"><span>LỊCH HẸN TUẦN NÀY</span><span class="stat-icon">◷</span></div>
+              <div class="stat-value" id="weekBookings">24 <small>lịch</small></div>
+              <div class="stat-foot"><span class="positive">↗ 4 lịch</span><span>so với tuần trước</span></div>
+            </article>
+            <article class="stat-card white">
+              <div class="stat-top"><span>KHÁCH HÀNG MỚI</span><span class="stat-icon">♡</span></div>
+              <div class="stat-value">08 <small>người</small></div>
+              <div class="stat-foot"><span class="neutral">Ổn định</span><span>trong tháng này</span></div>
+            </article>
+            <article class="stat-card rose-deep">
+              <div class="stat-top"><span>LỢI NHUẬN ƯỚC TÍNH</span><span class="stat-icon">✧</span></div>
+              <div class="stat-value light" id="monthProfit">12.980.000 <small>₫</small></div>
+              <div class="stat-foot light"><span>70,4%</span><span>tỷ lệ lợi nhuận</span></div>
+            </article>
+          </div>
+
+          <div class="overview-grid">
+            <section class="panel revenue-panel">
+              <div class="panel-heading"><div><p class="eyebrow">HIỆU SUẤT</p><h3>Doanh thu</h3></div><div class="segmented" id="revenueRange"><button class="selected" data-range="week">Tuần</button><button data-range="month">Tháng</button><button data-range="year">Năm</button></div></div>
+              <div class="chart-summary"><strong id="chartTotal">4.860.000 ₫</strong><span class="positive">↗ 8,4%</span><small>so với kỳ trước</small></div>
+              <div class="chart-wrap"><div class="chart-y"><span>2tr</span><span>1tr</span><span>500k</span><span>0</span></div><svg class="line-chart" viewBox="0 0 680 220" preserveAspectRatio="none" aria-label="Biểu đồ doanh thu"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e78a9c" stop-opacity=".28"/><stop offset="1" stop-color="#e78a9c" stop-opacity="0"/></linearGradient></defs><path class="grid-lines" d="M0 26H680 M0 82H680 M0 138H680 M0 194H680"/><path id="chartArea" class="chart-area" d="M0 188 C48 164 77 150 112 168 S173 121 225 139 S285 102 337 117 S391 76 450 111 S508 70 563 85 S629 42 680 58 L680 220 L0 220 Z"/><path id="chartLine" class="chart-line" d="M0 188 C48 164 77 150 112 168 S173 121 225 139 S285 102 337 117 S391 76 450 111 S508 70 563 85 S629 42 680 58"/><circle cx="680" cy="58" r="5" class="chart-dot"/></svg><div class="chart-x"><span>T2</span><span>T3</span><span>T4</span><span>Hôm nay</span><span>T6</span><span>T7</span><span>CN</span></div></div>
+            </section>
+
+            <section class="panel tomorrow-panel">
+              <div class="panel-heading"><div><p class="eyebrow">06 THÁNG 11</p><h3>Ngày mai</h3></div><button class="text-button" data-view-jump="calendar">Xem lịch <span>→</span></button></div>
+              <div class="tomorrow-total"><strong id="tomorrowCount">3</strong><span>lịch hẹn<br/>đã đặt</span><div class="mini-avatars"><span>H</span><span>M</span><span>+</span></div></div>
+              <div class="agenda-list" id="tomorrowAgenda"></div>
+              <button class="outline-button full" id="tomorrowAdd">＋ Thêm lịch hẹn</button>
+            </section>
+          </div>
+
+          <section class="panel week-panel">
+            <div class="panel-heading week-heading"><div><p class="eyebrow">LỊCH LÀM VIỆC</p><h3>Tuần này</h3></div><div class="week-controls"><button class="icon-button" id="weekPrev">‹</button><span id="weekLabel">03 – 09 tháng 11, 2026</span><button class="icon-button" id="weekNext">›</button><button class="outline-button small" data-view-jump="calendar">Mở lịch đầy đủ <span>→</span></button></div></div>
+            <div class="week-strip" id="weekStrip"></div>
+            <div class="week-events" id="weekEvents"></div>
+          </section>
+        </section>
+
+        <section class="view" id="calendarView">
+          <div class="page-heading compact"><div><p class="eyebrow rose">LỊCH HẸN</p><h2>Lịch làm việc</h2><p class="subheading">Theo dõi lịch nail và makeup trong một góc nhìn.</p></div><button class="primary-button" id="openBookingCalendar"><span>＋</span> Thêm lịch hẹn</button></div>
+          <section class="panel calendar-panel"><div class="calendar-toolbar"><div class="calendar-nav"><button class="icon-button" id="calPrev">‹</button><button class="outline-button today-button" id="calToday">Hôm nay</button><button class="icon-button" id="calNext">›</button><h3 id="calendarTitle">03 – 09 tháng 11, 2026</h3></div><div class="calendar-tools"><button class="view-switch selected">Tuần</button><button class="view-switch">Ngày</button><button class="filter-button">⌄ Tất cả dịch vụ</button></div></div><div class="calendar-grid"><div class="calendar-head"><div class="time-label">GMT+7</div><div id="calendarDays"></div></div><div class="calendar-body"><div class="time-column" id="timeColumn"></div><div class="calendar-slots" id="calendarSlots"><div class="now-line" id="nowLine"><span></span></div></div></div></div></section>
+        </section>
+
+        <section class="view" id="financeView">
+          <div class="page-heading compact"><div><p class="eyebrow rose">SỔ THU CHI</p><h2>Dòng tiền của studio</h2><p class="subheading">Theo dõi doanh thu và các khoản chi để luôn nắm rõ sức khoẻ tiệm.</p></div><button class="primary-button" id="openFinance"><span>＋</span> Ghi khoản mới</button></div>
+          <div class="finance-summary"><article class="finance-card income"><span>DOANH THU</span><strong id="financeIncome">18.450.000 ₫</strong><small>Trong tháng này</small></article><article class="finance-card expense"><span>CHI PHÍ</span><strong id="financeExpense">5.470.000 ₫</strong><small>Trong tháng này</small></article><article class="finance-card profit"><span>THỰC NHẬN</span><strong id="financeNet">12.980.000 ₫</strong><small>Doanh thu trừ chi phí</small></article></div>
+          <section class="panel transactions-panel"><div class="panel-heading"><div><p class="eyebrow">THÁNG 11, 2026</p><h3>Giao dịch gần đây</h3></div><div class="segmented"><button class="selected">Tất cả</button><button>Thu</button><button>Chi</button></div></div><div class="transaction-table" id="transactionTable"></div></section>
+        </section>
+
+        <section class="view" id="settingsView"><div class="page-heading compact"><div><p class="eyebrow rose">CÀI ĐẶT</p><h2>Không gian của bạn</h2><p class="subheading">Tùy chỉnh thông tin studio và các dịch vụ bạn đang cung cấp.</p></div></div><section class="panel settings-panel"><div class="settings-row"><div class="settings-avatar">LA</div><div><h3>Luna Atelier</h3><p>Studio Nail & Makeup</p></div><button class="outline-button">Đổi ảnh đại diện</button></div><div class="settings-form"><label>Tên studio<input value="Luna Atelier" /></label><label>Số điện thoại<input value="090 123 4567" /></label><label>Địa chỉ<input value="12 Hoa Hồng, Quận 3, TP. Hồ Chí Minh" /></label></div></section></section>
+
+        <nav class="mobile-bottom-nav"><button class="active" data-view="overview"><span>⌂</span>Tổng quan</button><button data-view="calendar"><span>□</span>Lịch</button><button class="mobile-add" id="mobileAdd">＋</button><button data-view="finance"><span>◌</span>Thu chi</button><button data-view="settings"><span>⚙</span>Khác</button></nav>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="bookingModal" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle"><div class="modal-header"><div><p class="eyebrow rose">LỊCH HẸN MỚI</p><h2 id="bookingModalTitle">Thêm lịch cho khách</h2></div><button class="close-button" data-close-modal="bookingModal">×</button></div><form id="bookingForm"><div class="service-tabs"><button type="button" class="selected" data-service="nail">✦ Nail</button><button type="button" data-service="makeup">◌ Makeup</button></div><div class="form-grid"><label class="wide">Tên khách hàng<input name="name" required placeholder="Ví dụ: Mai Anh" /></label><label>Số điện thoại<input name="phone" type="tel" placeholder="090 000 0000" /></label><label>Liên hệ qua<select name="contact"><option value="instagram">Instagram</option><option value="threads">Threads</option><option value="tiktok">TikTok</option><option value="zalo">Zalo</option></select></label><label>Ngày làm<input name="date" type="date" required value="2026-11-07" /></label><label>Giờ bắt đầu<input name="time" type="time" required value="10:00" /></label><label>Thời lượng<select name="duration"><option value="60">60 phút</option><option value="90" selected>90 phút</option><option value="120">120 phút</option><option value="180">180 phút</option></select></label><label>Mẫu khách chọn<input name="style" placeholder="Ví dụ: French tip hồng ngọc" /></label><label>Giá dịch vụ<input name="price" type="number" placeholder="450000" /></label><label class="wide">Ghi chú<textarea name="note" rows="3" placeholder="Màu yêu thích, lưu ý dị ứng..." ></textarea></label></div><div class="modal-footer"><button type="button" class="outline-button" data-close-modal="bookingModal">Huỷ</button><button type="submit" class="primary-button">Lưu lịch hẹn <span>→</span></button></div></form></div></div>
+
+    <div class="modal-backdrop" id="financeModal" aria-hidden="true"><div class="modal small-modal" role="dialog" aria-modal="true"><div class="modal-header"><div><p class="eyebrow rose">SỔ THU CHI</p><h2>Ghi khoản mới</h2></div><button class="close-button" data-close-modal="financeModal">×</button></div><form id="financeForm"><div class="finance-tabs"><button type="button" class="selected" data-kind="income">Khoản thu</button><button type="button" data-kind="expense">Khoản chi</button></div><div class="form-grid"><label class="wide">Nội dung<input name="title" required placeholder="Ví dụ: Tiền cọc lịch Mai Anh" /></label><label>Số tiền<input name="amount" type="number" required placeholder="450000" /></label><label>Ngày<input name="date" type="date" required value="2026-11-06" /></label><label class="wide">Ghi chú<textarea name="note" rows="3" placeholder="Thêm một chút chi tiết..." ></textarea></label></div><div class="modal-footer"><button type="button" class="outline-button" data-close-modal="financeModal">Huỷ</button><button type="submit" class="primary-button">Lưu giao dịch <span>→</span></button></div></form></div></div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+    <script src="ui.js"></script>
+    <script src="dropdowns.js"></script>
+  </body>
+</html>
