@@ -130,7 +130,7 @@ Cron Triggers trên Worker và chờ một lượt đồng bộ. Đăng nhập T
   tháng chỉ chứa ngày trong tháng đó. Sửa ngày sang tháng khác cập nhật cả hai
   file. Không ghi tay vào vùng A:G của các tab Tipi; dùng tab khác nếu cần. File
   thuộc Google của Phương; Tipi không tự cấp quyền chia sẻ Drive cho quản trị.
-- Đồng bộ một chiều. Nút **Đồng bộ lại** yêu cầu đối soát tất cả tháng đã quản
+- Đồng bộ một chiều. Nút **Đồng bộ ngay** chạy một lượt mà không cần chờ cron. Khi không còn dữ liệu chờ, nút yêu cầu đối soát tất cả tháng đã quản
   lý và lịch phù hợp ở lượt cron tiếp theo. Đợt lớn có thể cần nhiều lượt.
   Không ảnh hưởng đến việc lưu dữ liệu trong Tipi.
 - Ngắt kết nối giữ lại lịch và file Google đã tạo; không sao lưu lên Drive.

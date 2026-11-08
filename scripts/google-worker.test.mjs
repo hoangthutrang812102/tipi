@@ -55,3 +55,50 @@ test('only the owner can authorize, and callback rejects a different Google acco
   assert.equal(config.sheets,true);
   assert.doesNotMatch(JSON.stringify(config),/do-not-return-this/);
 });
+
+test('manual sync runs without cron and exposes a sanitized Google API error',async t => {
+  const env = {
+    TIPI_ORIGIN:'https://tipi.example',TIPI_SUPABASE_URL:'https://project.supabase.co',
+    TIPI_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_mock',TIPI_SUPABASE_SERVER_KEY:'sb_secret_mock',
+    GOOGLE_CLIENT_ID:'mock',GOOGLE_CLIENT_SECRET:'mock',
+    TIPI_GOOGLE_ENCRYPTION_KEY:'1'.repeat(64)
+  };
+  const key = await crypto.subtle.importKey('raw',new Uint8Array(32).fill(17),'AES-GCM',false,['encrypt']);
+  const iv = new Uint8Array(12);
+  const enc = new TextEncoder();
+  const encrypted = await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('shop')},key,enc.encode('"refresh"'));
+  let config = {token:Buffer.from(iv).toString('base64url')+'.'+Buffer.from(encrypted).toString('base64url'),calendar:true,calendarId:'calendar'};
+  let disabled = true;
+  let calls = 0;
+  t.mock.method(globalThis,'fetch',async (input,options) => {
+    const url = new URL(input);
+    const name = url.pathname;
+    if (name.endsWith('/tipi_workspace')) return Response.json({workspace_id:'shop',role:'owner'});
+    if (name.endsWith('/tipi_google_lock')) return Response.json(true);
+    if (name.endsWith('/tipi_google')) {
+      if (options.method==='PATCH') config=JSON.parse(options.body).config || config;
+      return Response.json([{config,workspace_id:'shop'}]);
+    }
+    if (name.endsWith('/tipi_state')) return Response.json([{revision:1,data:{bookings:[],transactions:[]}}]);
+    if (name.endsWith('/token')) return Response.json({access_token:'access'});
+    if (name.endsWith('/events')) {
+      calls++;
+      return disabled?Response.json({error:{message:'private upstream details',details:[{reason:'SERVICE_DISABLED'}]}},{status:403})
+        :Response.json({items:[]});
+    }
+    throw new Error('Unexpected request: '+name);
+  });
+  const post = action => worker.fetch(new Request(env.TIPI_ORIGIN+'/api/google/'+action,{
+    method:'POST',headers:{Authorization:'Bearer session'}
+  }),env);
+  assert.deepEqual(await (await post('retry')).json(),{outcome:'failed'});
+  const status = await (await post('status')).json();
+  assert.equal(status.error,'calendar-disabled');
+  assert.equal(status.pending,true);
+  assert.doesNotMatch(JSON.stringify(status),/private upstream details|refresh|token/);
+  disabled = false;
+  assert.deepEqual(await (await post('retry')).json(),{outcome:'complete'});
+  assert.equal(calls,2);
+  assert.equal(config.calendarRevision,1);
+  assert.equal(config.error,null);
+});

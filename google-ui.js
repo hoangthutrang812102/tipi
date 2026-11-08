@@ -8,6 +8,17 @@ const messages = {
   failed:'Chưa kết nối được Google. Hãy kiểm tra cấu hình rồi thử lại.'
 };
 
+function errorMessage(code) {
+  const service = {calendar:'Google Calendar',drive:'Google Drive',sheets:'Google Sheets'};
+  const match = /^(calendar|drive|sheets)-(disabled|\d{3}|failed)$/.exec(code);
+  if (!match) return 'Đồng bộ gặp lỗi'+(/^google-\d{3}$/.test(code)?' ('+code.slice(7)+')':'')+'. Tipi sẽ thử lại.';
+  const [,kind,reason] = match;
+  const name = service[kind];
+  if (reason === 'disabled') return name+' API chưa được bật trong Google Cloud. Bật API rồi thử lại.';
+  if (reason === '403') return name+' từ chối quyền (403). Kiểm tra API đã bật và quyền Google đã cấp.';
+  return name+' chưa đồng bộ được ('+reason+'). Tipi sẽ thử lại.';
+}
+
 export function setupGoogle(client,role) {
   document.querySelector('.tipi-google')?.remove();
   if (role === 'legacy') return;
@@ -21,7 +32,7 @@ export function setupGoogle(client,role) {
     <div class="cloud-actions">
       ${owner?'<button type="button" class="outline-button" data-google="connect">Kết nối Google</button>':''}
       <button type="button" class="outline-button" data-google="status">Cập nhật trạng thái</button>
-      ${owner?'<button type="button" class="outline-button" data-google="retry" hidden>Đồng bộ lại</button><button type="button" class="outline-button" data-google="disconnect" hidden>Ngắt kết nối</button>':''}
+      ${owner?'<button type="button" class="outline-button" data-google="retry" hidden>Đồng bộ ngay</button><button type="button" class="outline-button" data-google="disconnect" hidden>Ngắt kết nối</button>':''}
     </div><div class="cloud-actions" data-google-files></div>`;
   document.querySelector('.settings-panel').append(section);
   const status = section.querySelector('[role=status]');
@@ -55,7 +66,7 @@ export function setupGoogle(client,role) {
     const state = data.error==='reconnect'?'Cần kết nối lại Google.'
       : data.error==='calendar-create-uncertain'?'Chưa xác định được lịch Google đã tạo. Liên hệ quản trị để kiểm tra.'
       : data.error==='duplicate-month'?'Có nhiều file thu chi cùng tháng. Liên hệ quản trị để xử lý.'
-      : data.error?'Đồng bộ gặp lỗi, Tipi sẽ thử lại.'
+      : data.error?errorMessage(data.error)
       : data.busy?'Đang đồng bộ.' : data.pending?'Đang chờ đồng bộ.' : 'Đã đồng bộ.';
     info.textContent = data.email
       ? data.email+' · '+[data.calendar?'Calendar':'',data.sheets?'Sheets':''].filter(Boolean).join(' + ')+' · '+state
@@ -90,9 +101,10 @@ export function setupGoogle(client,role) {
         location.assign(url);
         return;
       }
-      if (action === 'disconnect' || action === 'retry') await call(action);
+      const result = action === 'disconnect' || action === 'retry' ? await call(action) : null;
       await refresh();
-      if (!quiet) status.textContent = action==='retry'?'Đã yêu cầu đồng bộ lại.'
+      if (!quiet) status.textContent = action==='retry'?(result.outcome==='complete'?'Đã đồng bộ xong.'
+        :result.outcome==='failed'?'Đồng bộ chưa thành công. Xem lỗi bên dưới.':'Còn dữ liệu chờ lượt đồng bộ tiếp theo.')
         : action==='disconnect'?'Đã ngắt kết nối. Lịch và file Google đã tạo vẫn được giữ.':'';
     } catch (error) {
       status.textContent = error.message;

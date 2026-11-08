@@ -45,6 +45,7 @@ async function request(url,options={}) {
     error.status = response.status;
     const payload = await response.json().catch(() => null);
     if (payload?.error === 'invalid_grant') error.reconnect = true;
+    if (payload?.error?.details?.some?.(item => item.reason === 'SERVICE_DISABLED')) error.disabled = true;
     throw error;
   }
   return response.status === 204 ? null : response.json();
@@ -85,13 +86,22 @@ function token(e,params) {
   })});
 }
 function google(access,signal) {
-  return (url,method='GET',body) => request(url,{method,signal,headers:{
-    Authorization:'Bearer '+access,'Content-Type':'application/json'
-  },body:body===undefined?undefined:JSON.stringify(body)});
+  return async (url,method='GET',body) => {
+    try {
+      return await request(url,{method,signal,headers:{
+        Authorization:'Bearer '+access,'Content-Type':'application/json'
+      },body:body===undefined?undefined:JSON.stringify(body)});
+    } catch (error) {
+      error.service = url.includes('/calendar/v3/') ? 'calendar'
+        : url.includes('/drive/v3/') ? 'drive' : 'sheets';
+      throw error;
+    }
+  };
 }
 function note(error) {
   if (error.reconnect) return 'reconnect';
   if (error.message === 'calendar-create-uncertain' || error.message === 'duplicate-month') return error.message;
+  if (error.service) return error.service+'-'+(error.disabled?'disabled':error.status || 'failed');
   return error.status ? 'google-'+error.status : 'sync-failed';
 }
 async function snapshot(e,id) {
@@ -100,10 +110,14 @@ async function snapshot(e,id) {
 }
 
 async function sync(e,workspace,force=false) {
-  return withLock(e,workspace,async (cfg,checkpoint) => {
-    if (!cfg.token || (cfg.error==='reconnect' && !force)) return;
+  let outcome = 'idle';
+  const locked = await withLock(e,workspace,async (cfg,checkpoint) => {
+    if (!cfg.token) { outcome = 'disconnected'; return; }
+    if (cfg.error==='reconnect' && !force) return;
     const input = await snapshot(e,workspace);
-    if (force) {
+    const upToDate = (!cfg.calendar || cfg.calendarRevision===input.revision)
+      && (!cfg.sheets || cfg.sheetsRevision===input.revision);
+    if (upToDate && force) {
       delete cfg.calendarRevision;
       delete cfg.sheetsRevision;
       for (const file of Object.values(cfg.files || {})) delete file.hash;
@@ -119,10 +133,13 @@ async function sync(e,workspace,force=false) {
       const done = await reconcile(google(result.access_token,AbortSignal.timeout(90000)),cfg,workspace,input,checkpoint);
       cfg.error = null;
       if (done) cfg.lastSync = new Date().toISOString();
+      outcome = done ? 'complete' : 'pending';
     } catch (error) {
       cfg.error = note(error);
+      outcome = 'failed';
     }
   });
+  return locked ? outcome : 'busy';
 }
 
 function redirect(e,result) {
@@ -224,15 +241,10 @@ async function route(req,e,ctx,url) {
     return ok ? json({ok}) : json({error:'Đang đồng bộ. Hãy thử lại sau.'},409);
   }
   if (action === 'retry') {
-    // Queue the reset durably; cron does the actual work after the HTTP response.
-    const ok = await withLock(e,id,async cfg => {
-      if (!cfg.token) return;
-      delete cfg.calendarRevision;
-      delete cfg.sheetsRevision;
-      for (const file of Object.values(cfg.files || {})) delete file.hash;
-      if (cfg.error !== 'reconnect') cfg.error = null;
-    });
-    return ok ? json({ok}) : json({error:'Đang đồng bộ. Hãy thử lại sau.'},409);
+    const outcome = await sync(e,id,true);
+    if (outcome === 'busy') return json({error:'Đang có lượt đồng bộ khác. Hãy thử lại sau.'},409);
+    if (outcome === 'disconnected') return json({error:'Hãy kết nối Google trước.'},409);
+    return json({outcome});
   }
   return json({error:'Không tìm thấy chức năng.'},404);
 }
@@ -251,7 +263,11 @@ export default {
   },
   async scheduled(_event,e) {
     if (!configured(e)) return;
-    const [row] = await db(e,'tipi_google?config-%3E%3Etoken=not.is.null&select=workspace_id&limit=1');
-    if (row) await sync(e,row.workspace_id);
+    try {
+      const [row] = await db(e,'tipi_google?select=workspace_id&limit=1');
+      if (row) await sync(e,row.workspace_id);
+    } catch {
+      throw new Error('Tipi cron could not access Supabase or save sync status');
+    }
   }
 };
