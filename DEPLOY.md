@@ -124,9 +124,12 @@ Cron Triggers trên Worker và chờ một lượt đồng bộ. Đăng nhập T
 
 - Calendar: chỉ đưa lịch chưa hủy từ hôm nay trở đi khi chưa có sự kiện. Sự kiện
   đã quản lý tiếp tục được sửa hoặc gỡ khi hủy; lịch cá nhân không bị sửa. Không
-  đưa tên, số điện thoại, ảnh và ghi chú khách vào Calendar. Tiêu đề phân biệt
-  Nail/Makeup và giờ theo Việt Nam.
-- Sheets: một file mỗi tháng, tab tổng quan và tuần thứ Hai–Chủ nhật. Tuần giao
+  gửi ảnh mẫu hoặc mời khách. Sự kiện riêng tư có tiêu đề
+  `Tipi - Nail/Makeup - Tên khách`, giờ Việt Nam, và phần mô tả chứa thông tin
+  khách cùng chi tiết lịch hẹn. Chỉ chia sẻ lịch với người được phép xem dữ liệu khách.
+- Sheets: `Tipi - Thu chi MM/YYYY` nằm trong `Tipi - Thu chi/YYYY` trên Drive.
+  File đã đồng bộ được đổi tên và di chuyển trong lượt đồng bộ kế tiếp, giữ nguyên ID.
+  Mỗi file có tab tổng quan và tuần thứ Hai–Chủ nhật. Tuần giao
   tháng chỉ chứa ngày trong tháng đó. Sửa ngày sang tháng khác cập nhật cả hai
   file. Không ghi tay vào vùng A:G của các tab Tipi; dùng tab khác nếu cần. File
   thuộc Google của Phương; Tipi không tự cấp quyền chia sẻ Drive cho quản trị.

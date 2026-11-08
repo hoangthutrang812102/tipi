@@ -1,4 +1,4 @@
-import {reconcile} from './sync.js';
+import {needsCalendar,needsSheets,reconcile} from './sync.js';
 
 const root = '/api/google/';
 const callback = root+'callback';
@@ -100,7 +100,7 @@ function google(access,signal) {
 }
 function note(error) {
   if (error.reconnect) return 'reconnect';
-  if (error.message === 'calendar-create-uncertain' || error.message === 'duplicate-month') return error.message;
+  if (['calendar-create-uncertain','duplicate-month','duplicate-folder','month-file-unavailable','drive-create-uncertain'].includes(error.message)) return error.message;
   if (error.service) return error.service+'-'+(error.disabled?'disabled':error.status || 'failed');
   return error.status ? 'google-'+error.status : 'sync-failed';
 }
@@ -115,14 +115,13 @@ async function sync(e,workspace,force=false) {
     if (!cfg.token) { outcome = 'disconnected'; return; }
     if (cfg.error==='reconnect' && !force) return;
     const input = await snapshot(e,workspace);
-    const upToDate = (!cfg.calendar || cfg.calendarRevision===input.revision)
-      && (!cfg.sheets || cfg.sheetsRevision===input.revision);
+    const upToDate = !needsCalendar(cfg,input.revision) && !needsSheets(cfg,input.revision);
     if (upToDate && force) {
       delete cfg.calendarRevision;
       delete cfg.sheetsRevision;
       for (const file of Object.values(cfg.files || {})) delete file.hash;
     }
-    if ((!cfg.calendar || cfg.calendarRevision===input.revision) && (!cfg.sheets || cfg.sheetsRevision===input.revision)) return;
+    if (!needsCalendar(cfg,input.revision) && !needsSheets(cfg,input.revision)) return;
     try {
       const refresh = await unseal(e,cfg.token,workspace);
       const result = await token(e,{grant_type:'refresh_token',refresh_token:refresh});
@@ -195,7 +194,7 @@ async function route(req,e,ctx,url) {
     const [row] = await db(e,cfgPath(id)+'&select=config,lease_until');
     const cfg = row?.config || {};
     const {revision} = await snapshot(e,id);
-    const pending = Boolean(cfg.token && ((cfg.calendar && cfg.calendarRevision!==revision) || (cfg.sheets && cfg.sheetsRevision!==revision)));
+    const pending = Boolean(cfg.token && (needsCalendar(cfg,revision) || needsSheets(cfg,revision)));
     return json({
       email:cfg.token?cfg.email:null,calendar:Boolean(cfg.token && cfg.calendar),sheets:Boolean(cfg.token && cfg.sheets),
       error:cfg.token?cfg.error:null,lastSync:cfg.lastSync,pending,

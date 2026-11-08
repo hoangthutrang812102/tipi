@@ -66,6 +66,9 @@ export function setupGoogle(client,role) {
     const state = data.error==='reconnect'?'Cần kết nối lại Google.'
       : data.error==='calendar-create-uncertain'?'Chưa xác định được lịch Google đã tạo. Liên hệ quản trị để kiểm tra.'
       : data.error==='duplicate-month'?'Có nhiều file thu chi cùng tháng. Liên hệ quản trị để xử lý.'
+      : data.error==='duplicate-folder'?'Có nhiều thư mục đồng bộ của Tipi trùng mã. Liên hệ quản trị để xử lý.'
+      : data.error==='drive-create-uncertain'?'Chưa xác định được file hoặc thư mục đã tạo trên Drive. Tipi sẽ kiểm tra lại, không tạo bản trùng.'
+      : data.error==='month-file-unavailable'?'File thu chi cũ đã vào thùng rác hoặc không còn thuộc Tipi. Không tạo file trùng.'
       : data.error?errorMessage(data.error)
       : data.busy?'Đang đồng bộ.' : data.pending?'Đang chờ đồng bộ.' : 'Đã đồng bộ.';
     info.textContent = data.email
@@ -78,7 +81,7 @@ export function setupGoogle(client,role) {
       link.href = 'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(file.id)+'/edit';
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      link.textContent = 'Thu chi '+file.month.slice(5)+'/'+file.month.slice(0,4);
+      link.textContent = 'Tipi - Thu chi '+file.month.slice(5)+'/'+file.month.slice(0,4);
       files.append(link);
     }
     if (owner) {

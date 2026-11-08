@@ -5,6 +5,19 @@ const vn = 'Asia/Ho_Chi_Minh';
 const enc = encodeURIComponent;
 const day = 86400000;
 const service = {nail:'Nail', makeup:'Makeup', shared:'Chi phí chung'};
+const contacts = {instagram:'Instagram',threads:'Threads',tiktok:'TikTok',zalo:'Zalo'};
+const calendarFormat = 2;
+const driveFormat = 2;
+const vnd = new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'});
+const escapeHtml = text => String(text).replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const monthFileName = month => 'Tipi - Thu chi '+month.slice(5)+'/'+month.slice(0,4);
+
+export function needsCalendar(cfg,revision) {
+  return cfg.calendar && (cfg.calendarRevision !== revision || cfg.calendarFormat !== calendarFormat);
+}
+export function needsSheets(cfg,revision) {
+  return cfg.sheets && (cfg.sheetsRevision !== revision || cfg.driveFormat !== driveFormat);
+}
 
 export async function digest(value) {
   const bytes = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value)));
@@ -14,8 +27,19 @@ export async function digest(value) {
 export function eventFor(booking) {
   const start = new Date(booking.date+'T'+booking.time+':00+07:00');
   const end = new Date(start.getTime()+Number(booking.duration)*60000);
+  const kind = service[booking.service] || 'Lịch hẹn';
+  const name = booking.name?.trim();
+  const fields = [
+    ['Tên khách',name],['Số điện thoại',booking.phone],['Dịch vụ',kind],
+    ['Ngày',booking.date.split('-').reverse().join('/')],
+    ['Giờ',booking.time+' (giờ Việt Nam)'],['Thời lượng',booking.duration+' phút'],
+    ['Kênh liên hệ',contacts[booking.contact]],['Nhu cầu / mẫu chọn',booking.style],
+    ['Giá',Number(booking.price)>0?vnd.format(Number(booking.price)):null],['Ghi chú',booking.note]
+  ];
   return {
-    summary: 'Tipi · '+(service[booking.service] || 'Lịch hẹn'),
+    summary: 'Tipi - '+kind+(name?' - '+name:''),
+    description:fields.filter(([,value]) => String(value ?? '').trim())
+      .map(([label,value]) => label+': '+escapeHtml(String(value).trim()).replace(/\r?\n/g,'<br>')).join('<br>'),
     start:{dateTime:start.toISOString(),timeZone:vn},
     end:{dateTime:end.toISOString(),timeZone:vn},
     visibility:'private'
@@ -71,7 +95,8 @@ async function calendarSync(api,cfg,workspace,bookings,revision,checkpoint) {
     const body = eventFor(booking);
     const sameTime = (a,b) => Date.parse(a?.dateTime) === Date.parse(b.dateTime);
     if (previous?.summary === body.summary && sameTime(previous.start,body.start)
-      && sameTime(previous.end,body.end) && previous.visibility === body.visibility) continue;
+      && sameTime(previous.end,body.end) && previous.visibility === body.visibility
+      && previous.description === body.description) continue;
     if (!budget--) return false;
     body.extendedProperties = {private:{tipiWorkspace:workspace,tipiBooking:key}};
     if (previous) await api(path+'/'+enc(previous.id),'PATCH',body);
@@ -100,7 +125,7 @@ export function monthTabs(month,transactions) {
   const last = new Date(Date.UTC(year,num,0));
   const offset = (first.getUTCDay()+6)%7;
   const tabs = [['Tổng quan',[
-    ['Thu chi '+month.slice(5)+'/'+month.slice(0,4)],
+    [monthFileName(month)],
     ['Mảng dịch vụ','Tổng thu','Tổng chi','Chênh lệch']
   ]]];
   const label = date => date.toISOString().slice(8,10)+'/'+date.toISOString().slice(5,7);
@@ -149,8 +174,57 @@ async function updateMonth(api,fileId,tabs) {
   await api(path+':batchUpdate','POST',{requests});
 }
 
+async function taggedDriveFile(api,mimeType,key,tag) {
+  const query = "trashed = false and mimeType = '"+mimeType+"' and appProperties has { key='"+key+"' and value='"+tag+"' }";
+  const files = await list(api,drive+'?q='+enc(query)+'&fields=files(id,name,parents),nextPageToken&pageSize=100','files');
+  if (files.length > 1) throw new Error(key==='tipiMonth'?'duplicate-month':'duplicate-folder');
+  return files[0];
+}
+
+async function organizeMonth(api,file,name,folder) {
+  const current = file.parents || [];
+  const params = new URLSearchParams({fields:'id,name,parents'});
+  if (!current.includes(folder)) params.set('addParents',folder);
+  const remove = current.filter(id => id !== folder);
+  if (remove.length) params.set('removeParents',remove.join(','));
+  if (file.name !== name || params.has('addParents') || remove.length) {
+    await api(drive+'/'+enc(file.id)+'?'+params,'PATCH',{name});
+  }
+}
+
+async function createDriveFile(api,cfg,tag,body,checkpoint) {
+  cfg.creatingFiles ??= {};
+  // If the response was lost, reconcile by tag instead of blindly creating again.
+  if (cfg.creatingFiles[tag]) throw new Error('drive-create-uncertain');
+  cfg.creatingFiles[tag] = true;
+  await checkpoint();
+  try {
+    const file = await api(drive+'?fields=id,name,parents','POST',body);
+    delete cfg.creatingFiles[tag];
+    return file;
+  } catch (error) {
+    if (error.status >= 400 && error.status < 500 && error.status !== 408) delete cfg.creatingFiles[tag];
+    throw error;
+  }
+}
+
 async function sheetSync(api,cfg,workspace,transactions,checkpoint) {
   cfg.files ??= {};
+  const folderMime = 'application/vnd.google-apps.folder';
+  const sheetMime = 'application/vnd.google-apps.spreadsheet';
+  const folders = new Map();
+  async function folder(name,parent) {
+    if (folders.has(name)) return folders.get(name);
+    const tag = workspace+':'+(parent?name:'root');
+    const found = await taggedDriveFile(api,folderMime,'tipiFolder',tag);
+    const info = found || await createDriveFile(api,cfg,'folder:'+tag,{
+      name,mimeType:folderMime,appProperties:{tipiFolder:tag},...(parent?{parents:[parent]}:{})
+    },checkpoint);
+    if (cfg.creatingFiles) delete cfg.creatingFiles['folder:'+tag];
+    if (found && parent) await organizeMonth(api,found,name,parent);
+    folders.set(name,info.id);
+    return info.id;
+  }
   const groups = new Map(Object.keys(cfg.files).map(m => [m,[]]));
   for (const t of transactions) {
     const key = t.date.slice(0,7);
@@ -161,21 +235,32 @@ async function sheetSync(api,cfg,workspace,transactions,checkpoint) {
   for (const [month,rows] of groups) {
     const tabs = monthTabs(month,rows);
     const hash = await digest(tabs);
-    if (cfg.files[month]?.hash === hash) continue;
+    if (cfg.files[month]?.hash === hash && cfg.files[month]?.layout === driveFormat) continue;
     if (!budget--) return false;
-    if (!cfg.files[month]?.id) {
+    const entry = cfg.files[month] ??= {};
+    if (entry.layout !== driveFormat || !entry.id) {
+      const parent = await folder('Tipi - Thu chi');
+      const year = await folder(month.slice(0,4),parent);
+      const name = monthFileName(month);
       const tag = workspace+':'+month;
-      const query = "trashed = false and mimeType = 'application/vnd.google-apps.spreadsheet' and appProperties has { key='tipiMonth' and value='"+tag+"' }";
-      const {files} = await api(drive+'?q='+enc(query)+'&fields=files(id),nextPageToken&pageSize=2');
-      if (files.length > 1) throw new Error('duplicate-month');
-      const id = files[0]?.id || (await api(drive+'?fields=id','POST',{
-        name:tabs[0][1][0][0],mimeType:'application/vnd.google-apps.spreadsheet',appProperties:{tipiMonth:tag}
-      })).id;
-      cfg.files[month] = {id};
+      const existing = entry.id
+        ? await api(drive+'/'+enc(entry.id)+'?fields=id,name,parents,trashed,appProperties')
+        : await taggedDriveFile(api,sheetMime,'tipiMonth',tag);
+      if (existing) {
+        if (existing.trashed || (entry.id && existing.appProperties?.tipiMonth !== tag)) throw new Error('month-file-unavailable');
+        await organizeMonth(api,existing,name,year);
+        entry.id = existing.id;
+        if (cfg.creatingFiles) delete cfg.creatingFiles['month:'+tag];
+      } else {
+        entry.id = (await createDriveFile(api,cfg,'month:'+tag,{
+          name,mimeType:sheetMime,parents:[year],appProperties:{tipiMonth:tag}
+        },checkpoint)).id;
+      }
+      entry.layout = driveFormat;
       await checkpoint();
     }
-    await updateMonth(api,cfg.files[month].id,tabs);
-    cfg.files[month].hash = hash;
+    await updateMonth(api,entry.id,tabs);
+    entry.hash = hash;
   }
   return true;
 }
@@ -184,17 +269,23 @@ export async function reconcile(api,cfg,workspace,snapshot,checkpoint) {
   const {data,revision} = snapshot;
   let calendarDone = true, sheetsDone = true;
   let failure;
-  if (cfg.calendar && cfg.calendarRevision !== revision) {
+  if (needsCalendar(cfg,revision)) {
     try {
       calendarDone = await calendarSync(api,cfg,workspace,data.bookings,revision,checkpoint);
-      if (calendarDone) cfg.calendarRevision = revision;
+      if (calendarDone) {
+        cfg.calendarRevision = revision;
+        cfg.calendarFormat = calendarFormat;
+      }
     } catch (error) {
       failure = error;
     }
   }
-  if (cfg.sheets && cfg.sheetsRevision !== revision) {
+  if (needsSheets(cfg,revision)) {
     sheetsDone = await sheetSync(api,cfg,workspace,data.transactions,checkpoint);
-    if (sheetsDone) cfg.sheetsRevision = revision;
+    if (sheetsDone) {
+      cfg.sheetsRevision = revision;
+      cfg.driveFormat = driveFormat;
+    }
   }
   if (failure) throw failure;
   return calendarDone && sheetsDone;
