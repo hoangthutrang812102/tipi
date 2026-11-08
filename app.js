@@ -229,7 +229,7 @@ function renderFinance() {
   el('#financeIncome').textContent=money(income); el('#financeExpense').textContent=money(expense); el('#financeNet').textContent=money(income-expense);
   el('#monthRevenue').textContent=money(income); el('#monthProfit').textContent=money(income-expense);
   const rows=tx.filter(t=>state.kind==='all'||t.kind===state.kind).sort((a,b)=>b.date.localeCompare(a.date));
-  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (rows.map(t=>`<div class="transaction-row"><div><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div>${shortDate(parseDate(t.date))}</div><div>${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng này.</p>');
+  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (rows.map(t=>`<div class="transaction-row"><div><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div>${shortDate(parseDate(t.date))}</div><div>${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="transaction-actions"><span class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</span><button type="button" class="outline-button transaction-delete" data-delete-transaction="${esc(t.id)}" aria-label="Xóa giao dịch ${esc(t.title)}">Xóa</button></div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng này.</p>');
   els('[data-kind-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.kindFilter===state.kind);b.setAttribute('aria-pressed',b.dataset.kindFilter===state.kind);});
   const bs=visibleBookings();
   el('#weekBookings').textContent=bs.filter(b=>within(b.date,period(today(),'week'))).length+' lịch';
@@ -238,6 +238,26 @@ function renderFinance() {
   el('.stat-card.white .stat-value').textContent=new Set(bs.filter(b=>within(b.date,bounds)).map(b=>b.phone||b.name.trim().toLowerCase())).size+' người';
   els('.stat-foot').forEach(n=>n.textContent='Theo dữ liệu đã ghi nhận');
   renderChart();
+}
+async function deleteTransaction(button) {
+  const id = button.dataset.deleteTransaction;
+  const item = state.transactions.find(t => String(t.id) === id);
+  if (!item || button.disabled) return;
+  const kind = item.kind === 'income' ? 'khoản thu' : 'khoản chi';
+  if (!window.confirm(`Xóa ${kind} “${item.title}” (${money(item.amount)}, ${shortDate(parseDate(item.date))})? Thao tác này không thể hoàn tác.`)) return;
+  const index = els('[data-delete-transaction]').indexOf(button);
+  button.disabled = true;
+  try {
+    await persist({transactions:state.transactions.filter(t => t !== item)}, () => {
+      const restoreFocus = document.activeElement === button || document.activeElement === document.body;
+      renderFinance();
+      const remaining = els('[data-delete-transaction]');
+      if (restoreFocus && state.view === 'finance') (remaining[Math.min(index,remaining.length-1)] || el('#openFinance')).focus();
+      toast('Đã xóa '+kind+'.');
+    });
+  } finally {
+    button.disabled = false;
+  }
 }
 function renderChart() {
   const bounds=period(today(),state.range);
@@ -374,6 +394,7 @@ document.addEventListener('click', e=>{
   else if(b.dataset.day) {state.date=parseDate(b.dataset.day);state.weekStart=monday(state.date);state.mode='day';setView('calendar');}
   else if(b.dataset.mode) {state.mode=b.dataset.mode;renderCalendar();}
   else if(b.dataset.kindFilter) {state.kind=b.dataset.kindFilter;renderFinance();}
+  else if(b.hasAttribute('data-delete-transaction')) void deleteTransaction(b);
   else if(b.dataset.service) {state.service=b.dataset.service;els('[data-service]').forEach(n=>n.classList.toggle('selected',n===b));}
   else if(b.dataset.kind) {state.financeKind=b.dataset.kind;els('.finance-tabs button').forEach(n=>n.classList.toggle('selected',n===b));}
   else if(b.dataset.range) {state.range=b.dataset.range;els('[data-range]').forEach(n=>n.classList.toggle('selected',n===b));renderChart();}

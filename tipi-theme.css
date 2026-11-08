@@ -170,6 +170,10 @@ button,select,input,textarea { -webkit-tap-highlight-color:transparent; }
 .transaction-row>div { font-size:14px; overflow-wrap:anywhere; }
 .transaction-row>div:last-child { text-align:right; font-variant-numeric:tabular-nums; }
 .transaction-row.head,.transaction-row small { font-size:12px; color:var(--muted); }
+.transaction-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px 12px; }
+.outline-button.transaction-delete { min-height:36px; padding:4px 10px; color:#a32940; border-color:#c98594; }
+.outline-button.transaction-delete:hover:not(:disabled) { background:#fff0f2; }
+.transaction-delete:disabled { opacity:.55; cursor:wait; }
 .settings-panel { max-width:920px; padding:32px; }
 .settings-form { gap:24px; }
 .settings-form label,.form-grid label { color:var(--ink); font-size:14px; font-weight:500; }
