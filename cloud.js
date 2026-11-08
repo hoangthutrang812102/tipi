@@ -1,6 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {cloudStore, emptySnapshot, validateSnapshot} from './cloud-data.js';
+import {setupGoogle} from './google-ui.js';
 
 const client = createClient(TIPI_SUPABASE_URL,TIPI_SUPABASE_PUBLISHABLE_KEY,{auth:{flowType:'pkce'}});
 const app = window.tipiApp;
@@ -86,16 +87,22 @@ async function runAuthAction(action) {
 
 async function openWorkspace(session) {
   if (!session) return authScreen();
-  const {data:owner,error} = await client.rpc('tipi_is_owner');
-  if (error) throw new Error('Tipi chưa kết nối được với cấu hình database. Hãy áp dụng migration Supabase trước.');
-  if (!owner) {
-    await client.auth.signOut({scope:'local'});
-    return authScreen('login','Tài khoản này chưa được cấp quyền chủ tiệm Tipi.');
+  let {data:workspace,error} = await client.rpc('tipi_workspace');
+  if (error?.code === 'PGRST202') {
+    const legacy = await client.rpc('tipi_is_owner');
+    error = legacy.error;
+    workspace = legacy.data ? {workspace_id:session.user.id,role:'legacy'} : null;
   }
-  const store = cloudStore(client,session.user.id);
+  if (error) throw new Error('Tipi chưa kết nối được với cấu hình database. Hãy kiểm tra migration Supabase.');
+  if (!workspace) {
+    await client.auth.signOut({scope:'local'});
+    return authScreen('login','Tài khoản này chưa được cấp quyền vào Tipi.');
+  }
+  const store = cloudStore(client,workspace.workspace_id);
   app.load(await store.load());
   window.tipiCloud = store;
   setupSettings(session.user.email);
+  setupGoogle(client,workspace.role);
   loaded = true;
   document.documentElement.dataset.cloudReady = 'true';
   gate.hidden = true;
