@@ -47,7 +47,8 @@ const state = {
   profile: saved?.profile || {studio:'Tipi',owner:'Thu Phương',phone:'',address:'',avatar:''},
   view:'overview',workspace:'all',filter:'all',kind:'all',mode:'week',range:'week',
   date:today(),weekStart:monday(today()),service:'nail',financeKind:'income',
-  editing:null,images:[],imageLoading:false
+  editing:null,images:[],imageLoading:false,bookingSession:0,
+  financeEditing:null,financeMonth:null
 };
 const matchesWorkspace = b => state.workspace === 'all' || b.service === state.workspace;
 const visibleBookings = () => state.bookings.filter(b => !b.cancelledAt && matchesWorkspace(b));
@@ -87,6 +88,14 @@ function persist(next, afterSave = () => {}) {
 }
 function toast(s) { el('#toast').textContent=s; el('#toast').classList.add('show'); setTimeout(()=>el('#toast').classList.remove('show'),4000); }
 const modalStack = [];
+function sizeDialogViewport() {
+  const viewport=window.visualViewport;
+  if (!viewport || !modalStack.length) return;
+  document.documentElement.style.setProperty('--dialog-height',viewport.height+'px');
+  document.documentElement.style.setProperty('--dialog-top',viewport.offsetTop+'px');
+}
+window.visualViewport?.addEventListener('resize',sizeDialogViewport);
+window.visualViewport?.addEventListener('scroll',sizeDialogViewport);
 function openModal(id) {
   const previous = modalStack.at(-1)?.node;
   if (previous) {
@@ -95,6 +104,7 @@ function openModal(id) {
   }
   const node = el('#'+id);
   modalStack.push({node, returnFocus:document.activeElement});
+  sizeDialogViewport();
   node.style.zIndex = 50 + modalStack.length;
   node.classList.add('open');
   node.setAttribute('aria-hidden','false');
@@ -109,6 +119,10 @@ function closeModal(id) {
   modalStack.pop();
   current.node.classList.remove('open');
   current.node.setAttribute('aria-hidden','true');
+  if (id === 'imageModal') {
+    imageViewer.sources = [];
+    el('#imageStage').replaceChildren();
+  }
   const previous = modalStack.at(-1)?.node;
   if (previous) {
     previous.inert = false;
@@ -131,13 +145,24 @@ function initializeUI() {
   els('.transactions-panel .segmented button').forEach((b,i)=>b.dataset.kindFilter=['all','income','expense'][i]);
   el('#bookingForm [name=price]').min='0';
   el('#financeForm [name=amount]').min='1';
-  el('#bookingForm .form-grid').insertAdjacentHTML('beforeend','<label class="wide">Ảnh mẫu khách chọn (tối đa 3 ảnh)<input id="sampleUpload" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>JPG, PNG hoặc WebP, tối đa 10 MB mỗi ảnh.</small><div id="imagePreview" class="image-gallery"></div></label>');
+  el('#financeModal h2').id='financeModalTitle';
+  el('#financeModal [role=dialog]').setAttribute('aria-labelledby','financeModalTitle');
+  el('#financeModal .close-button').setAttribute('aria-label','Đóng');
+  el('#bookingForm .form-grid').insertAdjacentHTML('beforeend',`<section class="wide booking-attachments" aria-labelledby="sampleTitle">
+    <h3 id="sampleTitle">Ảnh mẫu khách chọn</h3>
+    <div class="attachment-actions"><label class="outline-button" for="sampleUpload">Chọn ảnh</label><input id="sampleUpload" class="attachment-input" type="file" aria-label="Chọn ảnh mẫu" accept="image/jpeg,image/png,image/webp" multiple>
+    <button class="outline-button" type="button" id="pasteSample">Dán ảnh</button></div>
+    <small id="sampleHint">Bạn cũng có thể nhấn Cmd+V hoặc Ctrl+V. Tối đa 3 ảnh JPG, PNG hoặc WebP, 10 MB mỗi ảnh.</small>
+    <p id="sampleStatus" class="attachment-status" role="status"></p><div id="imagePreview" class="image-gallery"></div>
+  </section>`);
   el('#financeForm .form-grid').insertAdjacentHTML('beforeend','<label class="wide">Mảng dịch vụ<select name="service"><option value="nail">Nail</option><option value="makeup">Makeup</option><option value="shared">Chi phí chung / chưa phân loại</option></select></label>');
   el('.settings-panel').innerHTML='<form id="profileForm"><div class="settings-row"><div class="settings-avatar">T</div><h3>Hồ sơ tiệm</h3></div><div class="settings-form"><label>Tên tiệm<input name="studio" required></label><label>Chủ tiệm<input name="owner" required></label><label>Số điện thoại<input name="phone" type="tel"></label><label>Địa chỉ<input name="address"></label><label>Ảnh đại diện<input id="avatarUpload" type="file" accept="image/jpeg,image/png,image/webp"></label></div><div class="modal-footer"><button class="primary-button">Lưu thông tin</button></div><p>Dữ liệu lưu trên trình duyệt này, chưa đồng bộ giữa các thiết bị.</p></form>';
   el('.profile-card > div:nth-child(2)').outerHTML='<button class="profile-name" data-account><strong></strong><span>Chủ tiệm</span></button>';
   el('.profile-card button.icon-button').dataset.account='';
   el('.top-avatar').dataset.account=''; el('.top-avatar').setAttribute('aria-label','Hồ sơ Thu Phương');
   modal('detailModal','Chi tiết lịch hẹn','<div id="bookingDetail"></div>');
+  modal('imageModal','Ảnh mẫu','<div id="imageStage" class="image-stage"></div><div class="image-controls"><button type="button" class="outline-button" data-image-step="-1" aria-label="Ảnh trước">‹</button><span id="imageCount" aria-live="polite"></span><button type="button" class="outline-button" data-image-step="1" aria-label="Ảnh tiếp theo">›</button></div>');
+  el('.transactions-panel .segmented').insertAdjacentHTML('beforebegin','<select id="financeMonth" aria-label="Tháng thu chi"></select>');
   modal('accountModal','Hồ sơ chủ tiệm','<div id="accountInfo"></div><button class="primary-button" id="editProfile">Chỉnh sửa hồ sơ</button>');
   modal('notificationModal','Lịch ngày mai','<div id="notificationList"></div>');
   modal('cancelledBookingsModal','Lịch đã hủy','<div id="cancelledBookingsList"></div>');
@@ -160,7 +185,6 @@ function renderProfile() {
 function renderDates() {
   el('#overviewView .page-heading .eyebrow').textContent=fullDate(today());
   el('.tomorrow-panel .eyebrow').textContent=fullDate(addDays(today(),1));
-  el('.transactions-panel .eyebrow').textContent=new Intl.DateTimeFormat('vi-VN',{month:'long',year:'numeric'}).format(today());
   el('.time-label').textContent='GMT+7';
   const labels={overview:'Tổng quan',calendar:'Lịch hẹn',finance:'Thu & chi',settings:'Cài đặt'};
   el('#breadcrumbMain').textContent=labels[state.view];
@@ -221,21 +245,35 @@ function renderCalendar() {
     return `<div class="calendar-day-column">${slots}${html}</div>`;
   }).join('');
 }
+const transactionIcons = {
+  edit:'<path d="m13.5 6.5 4 4M4 20l4-.8L19 8a2.8 2.8 0 0 0-4-4L4.8 15.2 4 20Z"/>',
+  delete:'<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>'
+};
+const transactionIcon = key => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+transactionIcons[key]+'</svg>';
 function renderFinance() {
-  const bounds=period(today(),'month');
-  const tx=visibleTransactions().filter(t=>within(t.date,bounds));
-  const total=kind=>tx.filter(t=>t.kind===kind).reduce((sum,t)=>sum+Number(t.amount),0);
-  const income=total('income'),expense=total('expense');
+  const current=iso(today()).slice(0,7), month=state.financeMonth || current;
+  const options=[...new Set([current,month,...state.transactions.map(t=>t.date.slice(0,7))])].sort().reverse();
+  const picker=el('#financeMonth');
+  picker.replaceChildren(...options.map(value=>new Option('Tháng '+value.slice(5)+'/'+value.slice(0,4),value)));
+  picker.value=month;
+  el('.transactions-panel .eyebrow').textContent='Tháng '+month.slice(5)+'/'+month.slice(0,4);
+  els('.finance-card.income small,.finance-card.expense small').forEach(node=>node.textContent='Tháng '+month.slice(5)+'/'+month.slice(0,4));
+  const visible=visibleTransactions();
+  const tx=visible.filter(t=>t.date.slice(0,7)===month);
+  const total=(items,kind)=>items.filter(t=>t.kind===kind).reduce((sum,t)=>sum+Number(t.amount),0);
+  const income=total(tx,'income'),expense=total(tx,'expense');
   el('#financeIncome').textContent=money(income); el('#financeExpense').textContent=money(expense); el('#financeNet').textContent=money(income-expense);
-  el('#monthRevenue').textContent=money(income); el('#monthProfit').textContent=money(income-expense);
+  const currentTx=month===current?tx:visible.filter(t=>t.date.slice(0,7)===current);
+  const monthIncome=total(currentTx,'income');
+  el('#monthRevenue').textContent=money(monthIncome); el('#monthProfit').textContent=money(monthIncome-total(currentTx,'expense'));
   const rows=tx.filter(t=>state.kind==='all'||t.kind===state.kind).sort((a,b)=>b.date.localeCompare(a.date));
-  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (rows.map(t=>`<div class="transaction-row"><div><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div>${shortDate(parseDate(t.date))}</div><div>${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="transaction-actions"><span class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</span><button type="button" class="outline-button transaction-delete" data-delete-transaction="${esc(t.id)}" aria-label="Xóa giao dịch ${esc(t.title)}">Xóa</button></div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng này.</p>');
+  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (rows.map(t=>`<div class="transaction-row"><div><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div>${shortDate(parseDate(t.date))}</div><div>${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="transaction-actions"><span class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</span><div class="transaction-tools"><button type="button" class="transaction-icon" data-edit-transaction="${esc(t.id)}" aria-label="Sửa giao dịch ${esc(t.title)}" title="Sửa">${transactionIcon('edit')}</button><button type="button" class="transaction-icon transaction-delete" data-delete-transaction="${esc(t.id)}" aria-label="Xóa giao dịch ${esc(t.title)}" title="Xóa">${transactionIcon('delete')}</button></div></div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng đã chọn.</p>');
   els('[data-kind-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.kindFilter===state.kind);b.setAttribute('aria-pressed',b.dataset.kindFilter===state.kind);});
   const bs=visibleBookings();
   el('#weekBookings').textContent=bs.filter(b=>within(b.date,period(today(),'week'))).length+' lịch';
   el('.nav-badge').textContent=bs.filter(b=>b.date===iso(today())).length;
   el('.stat-card.white .stat-top span').textContent='KHÁCH TRONG THÁNG';
-  el('.stat-card.white .stat-value').textContent=new Set(bs.filter(b=>within(b.date,bounds)).map(b=>b.phone||b.name.trim().toLowerCase())).size+' người';
+  el('.stat-card.white .stat-value').textContent=new Set(bs.filter(b=>within(b.date,period(today(),'month'))).map(b=>b.phone||b.name.trim().toLowerCase())).size+' người';
   els('.stat-foot').forEach(n=>n.textContent='Theo dữ liệu đã ghi nhận');
   renderChart();
 }
@@ -250,7 +288,7 @@ async function deleteTransaction(button) {
   try {
     await persist({transactions:state.transactions.filter(t => t !== item)}, () => {
       const restoreFocus = document.activeElement === button || document.activeElement === document.body;
-      renderFinance();
+      render();
       const remaining = els('[data-delete-transaction]');
       if (restoreFocus && state.view === 'finance') (remaining[Math.min(index,remaining.length-1)] || el('#openFinance')).focus();
       toast('Đã xóa '+kind+'.');
@@ -290,13 +328,49 @@ function setView(view) {
   const heading=el('#'+view+'View h2');heading.tabIndex=-1;heading.focus({preventScroll:true});
 }
 const safeImage = s => typeof s==='string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s);
+const imageViewer = {sources:[],index:0};
+function imageThumbnail(src,i) {
+  return `<button type="button" class="image-thumb" data-view-image aria-label="Xem ảnh mẫu ${i+1}"><img src="${src}" alt="Ảnh mẫu ${i+1}"></button>`;
+}
+function renderImageViewer() {
+  const {sources,index}=imageViewer;
+  const stage=el('#imageStage'), image=new Image();
+  image.alt='Ảnh mẫu '+(index+1);
+  image.onerror=()=>{
+    if (image.parentNode!==stage) return;
+    const error=document.createElement('p');
+    error.textContent='Không mở được ảnh này.';
+    error.setAttribute('role','status');
+    stage.replaceChildren(error);
+  };
+  stage.replaceChildren(image);
+  image.src=sources[index];
+  el('#imageCount').textContent='Ảnh '+(index+1)+' / '+sources.length;
+  els('[data-image-step]').forEach(b=>b.hidden=sources.length<2);
+}
+function openImageViewer(button) {
+  const thumbs=els('[data-view-image]',button.closest('.image-gallery'));
+  const sources=thumbs.map(b=>el('img',b).getAttribute('src'));
+  const index=thumbs.indexOf(button);
+  if (!safeImage(sources[index])) return;
+  imageViewer.sources=sources;
+  imageViewer.index=index;
+  renderImageViewer();
+  openModal('imageModal');
+}
+function stepImage(step) {
+  const count=imageViewer.sources.length;
+  if (count<2) return;
+  imageViewer.index=(imageViewer.index+step+count)%count;
+  renderImageViewer();
+}
 function showDetail(id) {
   const b=state.bookings.find(b=>String(b.id)===id); if(!b)return;
   const status = b.cancelledAt ? '<p class="booking-cancelled">Đã hủy</p>' : '';
   const actions = b.cancelledAt ? '' : `<div class="modal-footer"><button type="button" class="outline-button cancel-booking" data-cancel-booking="${esc(b.id)}">Hủy lịch hẹn</button><button type="button" class="primary-button" data-edit="${esc(b.id)}">Chỉnh sửa lịch hẹn</button></div>`;
   el('#bookingDetail').innerHTML=status+'<dl class="details">'+[
     ['Khách hàng',b.name],['Số điện thoại',b.phone||'Chưa có'],['Dịch vụ',services[b.service]],['Ngày',fullDate(parseDate(b.date))],['Giờ',b.time+' · '+b.duration+' phút'],['Liên hệ qua',contacts[b.contact]||b.contact],['Mẫu khách chọn',b.style||'Chưa có'],['Giá dịch vụ',money(b.price||0)],['Ghi chú',b.note||'Không có']
-  ].map(([k,v])=>'<div><dt>'+k+'</dt><dd>'+esc(v)+'</dd></div>').join('')+'</dl><div class="image-gallery">'+(b.images||[]).filter(safeImage).map(src=>`<a href="${src}" target="_blank" rel="noopener"><img src="${src}" alt="Ảnh mẫu khách chọn"></a>`).join('')+'</div>'+actions;
+  ].map(([k,v])=>'<div><dt>'+k+'</dt><dd>'+esc(v)+'</dd></div>').join('')+'</dl><div class="image-gallery">'+(b.images||[]).filter(safeImage).map(imageThumbnail).join('')+'</div>'+actions;
   openModal('detailModal');
 }
 function showCancelledBookings() {
@@ -317,9 +391,12 @@ function cancelBooking(id) {
     toast('Đã hủy lịch hẹn của '+booking.name);
   });
 }
-function imagePreview() { el('#imagePreview').innerHTML=state.images.filter(safeImage).map((src,i)=>`<div><img src="${src}" alt="Ảnh mẫu ${i+1}"><button type="button" data-remove-image="${i}">Bỏ ảnh</button></div>`).join(''); }
+function imagePreview() { el('#imagePreview').innerHTML=state.images.filter(safeImage).map((src,i)=>`<div>${imageThumbnail(src,i)}<button type="button" data-remove-image="${i}" aria-label="Bỏ ảnh mẫu ${i+1}">Bỏ ảnh</button></div>`).join(''); }
 function openBooking(date=iso(today()), b=null, time) {
   const form=el('#bookingForm'); form.reset(); state.editing=b?.id??null;
+  state.bookingSession++;
+  setImageLoading(false);
+  el('#sampleStatus').textContent='';
   state.service=b?.service||(state.workspace==='all'?'nail':state.workspace);
   state.images=[...(b?.images||[])]; imagePreview();
   for (const key of ['name','phone','date','time','duration','contact','style','price','note']) if(b && b[key]!=null) form.elements[key].value=b[key];
@@ -344,6 +421,33 @@ async function readImage(file) {
     canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return canvas.toDataURL('image/jpeg',0.8);
   } finally {URL.revokeObjectURL(url);}
+}
+function setImageLoading(loading) {
+  state.imageLoading=loading;
+  for (const selector of ['#bookingForm [type=submit]','#sampleUpload','#pasteSample']) el(selector).disabled=loading;
+}
+async function addBookingImages(getFiles,fallback) {
+  if (state.imageLoading || modalStack.at(-1)?.node.id!=='bookingModal') return;
+  const modal=modalStack.at(-1), session=state.bookingSession;
+  const status=el('#sampleStatus');
+  const stillOpen=()=>state.bookingSession===session && modalStack.includes(modal);
+  setImageLoading(true);
+  status.textContent='Đang đọc ảnh…';
+  try {
+    const files=await getFiles();
+    if (!stillOpen()) return;
+    if (!files.length) throw new Error(fallback);
+    if (state.images.length+files.length>3) throw new Error('Mỗi lịch hẹn có tối đa 3 ảnh.');
+    const images=await Promise.all(files.map(readImage));
+    if (!stillOpen()) return;
+    state.images.push(...images);
+    imagePreview();
+    status.textContent='Đã thêm '+images.length+' ảnh.';
+  } catch (error) {
+    if (stillOpen()) status.textContent=error.message || fallback;
+  } finally {
+    if (stillOpen()) setImageLoading(false);
+  }
 }
 initializeUI();
 if (!document.documentElement.hasAttribute('data-cloud')) {
@@ -395,10 +499,16 @@ document.addEventListener('click', e=>{
   else if(b.dataset.mode) {state.mode=b.dataset.mode;renderCalendar();}
   else if(b.dataset.kindFilter) {state.kind=b.dataset.kindFilter;renderFinance();}
   else if(b.hasAttribute('data-delete-transaction')) void deleteTransaction(b);
+  else if(b.hasAttribute('data-edit-transaction')) {
+    const item=state.transactions.find(t=>String(t.id)===b.dataset.editTransaction);
+    if (item) openFinance(item);
+  }
   else if(b.dataset.service) {state.service=b.dataset.service;els('[data-service]').forEach(n=>n.classList.toggle('selected',n===b));}
-  else if(b.dataset.kind) {state.financeKind=b.dataset.kind;els('.finance-tabs button').forEach(n=>n.classList.toggle('selected',n===b));}
+  else if(b.dataset.kind) selectFinanceKind(b.dataset.kind);
   else if(b.dataset.range) {state.range=b.dataset.range;els('[data-range]').forEach(n=>n.classList.toggle('selected',n===b));renderChart();}
   else if(b.hasAttribute('data-remove-image')) {state.images.splice(Number(b.dataset.removeImage),1);imagePreview();}
+  else if(b.hasAttribute('data-view-image')) openImageViewer(b);
+  else if(b.hasAttribute('data-image-step')) stepImage(Number(b.dataset.imageStep));
   else if(b.hasAttribute('data-account')) {
     el('#accountInfo').innerHTML='<h3>'+esc(state.profile.owner)+'</h3><p>Chủ tiệm '+esc(state.profile.studio)+'</p><p>'+esc(state.profile.phone||'Chưa thêm số điện thoại')+'</p><p>Hồ sơ trên thiết bị này; chưa có tài khoản đăng nhập hoặc đồng bộ.</p>';
     openModal('accountModal');
@@ -408,8 +518,12 @@ els('.modal-backdrop').forEach(n=>n.addEventListener('click',e=>{if(e.target===n
 document.addEventListener('keydown',e=>{
   const m=modalStack.at(-1)?.node;if(!m)return;
   if(e.key==='Escape'){closeModal(m.id);return;}
+  if(m.id==='imageModal' && ['ArrowLeft','ArrowRight'].includes(e.key)){
+    e.preventDefault();stepImage(e.key==='ArrowLeft'?-1:1);return;
+  }
   if(e.key==='Tab'){
-    const items=els('button:not(:disabled),input:not(:disabled),select:not([hidden]),textarea,a[href]',m),first=items[0],last=items.at(-1);
+    const items=els('button:not(:disabled),input:not(:disabled),select,textarea,a[href]',m)
+      .filter(node=>node.tabIndex>=0 && !node.closest('[hidden]')),first=items[0],last=items.at(-1);
     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
   }
@@ -436,13 +550,37 @@ for(const [id,n] of [['weekPrev',-7],['weekNext',7],['calPrev',-1],['calNext',1]
   state.date=addDays(state.date,step);state.weekStart=monday(state.date);render();
 };
 el('#calToday').onclick=()=>{state.date=today();state.weekStart=monday(state.date);render();};
-el('#sampleUpload').onchange=async e=>{
-  const files=[...e.target.files];if(state.images.length+files.length>3){toast('Mỗi lịch hẹn được chọn tối đa 3 ảnh.');e.target.value='';return;}
-  state.imageLoading=true;el('#bookingForm [type=submit]').disabled=true;
-  try{const images=await Promise.all(files.map(readImage));state.images.push(...images);imagePreview();}
-  catch(err){toast(err.message);}
-  finally{state.imageLoading=false;el('#bookingForm [type=submit]').disabled=false;e.target.value='';}
+el('#sampleUpload').onchange=e=>{
+  const files=[...e.target.files];
+  e.target.value='';
+  if (files.length) return addBookingImages(()=>files,'Không đọc được ảnh đã chọn.');
 };
+const pasteHint='Clipboard chưa có ảnh. Hãy sao chép ảnh thay vì đường link, hoặc dùng Chọn ảnh.';
+el('#pasteSample').onclick=()=>{
+  void addBookingImages(async ()=>{
+    if (!navigator.clipboard?.read) throw new Error('Trình duyệt không hỗ trợ nút Dán ảnh. Hãy thử Cmd+V / Ctrl+V hoặc Chọn ảnh.');
+    let items;
+    try {items=await navigator.clipboard.read();}
+    catch {throw new Error('Không đọc được clipboard. Hãy cho phép dán, thử Cmd+V / Ctrl+V hoặc dùng Chọn ảnh.');}
+    const allowed=['image/png','image/jpeg','image/webp'];
+    const blobs=await Promise.all(items.map(item=>{
+      const type=allowed.find(t=>item.types.includes(t));
+      return type?item.getType(type):null;
+    }));
+    return blobs.filter(Boolean);
+  },pasteHint);
+};
+document.addEventListener('paste',e=>{
+  if (modalStack.at(-1)?.node.id!=='bookingModal') return;
+  const clipboard=e.clipboardData;
+  if (!clipboard) return;
+  const fromItems=Array.from(clipboard.items || [])
+    .filter(item=>item.kind==='file' && item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);
+  const files=fromItems.length?fromItems:Array.from(clipboard.files || []).filter(file=>file.type.startsWith('image/'));
+  if (!files.length) return;
+  e.preventDefault();
+  void addBookingImages(()=>files,pasteHint);
+});
 el('#bookingForm').onsubmit=e=>{
   e.preventDefault();if(state.imageLoading)return;
   const data=Object.fromEntries(new FormData(e.target));data.name=data.name.trim();
@@ -453,17 +591,53 @@ el('#bookingForm').onsubmit=e=>{
   const bookings=state.editing===null?[...state.bookings,booking]:state.bookings.map(b=>b.id===state.editing?booking:b);
   persist({bookings}, () => {closeModal('bookingModal');render();toast('Đã lưu lịch hẹn của '+data.name);});
 };
-el('#openFinance').onclick=()=>{
-  el('#financeForm').reset();el('#financeForm [name=date]').value=iso(today());
-  state.financeKind='income';els('.finance-tabs button').forEach(b=>b.classList.toggle('selected',b.dataset.kind==='income'));
-  el('#financeForm [name=service]').value=state.workspace==='all'?'nail':state.workspace;openModal('financeModal');
-};
-el('#financeForm').onsubmit=e=>{
-  e.preventDefault();const data=Object.fromEntries(new FormData(e.target));data.title=data.title.trim();
-  if(!data.title||!Number.isFinite(Number(data.amount))||Number(data.amount)<=0){toast('Nhập nội dung và số tiền lớn hơn 0.');return;}
-  persist({transactions:[{...data,id:Date.now(),amount:Number(data.amount),kind:state.financeKind},...state.transactions]}, () => {
-    closeModal('financeModal');render();toast('Đã lưu giao dịch.');
+function selectFinanceKind(kind) {
+  state.financeKind=kind;
+  els('.finance-tabs button').forEach(b=>{
+    b.classList.toggle('selected',b.dataset.kind===kind);
+    b.setAttribute('aria-pressed',b.dataset.kind===kind);
   });
+}
+function openFinance(item=null) {
+  const form=el('#financeForm');
+  form.reset();
+  state.financeEditing=item?.id??null;
+  form.elements.date.value=iso(today());
+  form.elements.service.value=state.workspace==='all'?'nail':state.workspace;
+  if (item) for (const key of ['title','amount','date','service','note']) form.elements[key].value=item[key]??'';
+  selectFinanceKind(item?.kind || 'income');
+  el('#financeModal h2').textContent=item?'Sửa giao dịch':'Ghi khoản mới';
+  openModal('financeModal');
+}
+el('#openFinance').onclick=()=>openFinance();
+el('#financeMonth').onchange=e=>{state.financeMonth=e.target.value;renderFinance();};
+el('#financeForm').onsubmit=async e=>{
+  e.preventDefault();
+  const modal=modalStack.at(-1), button=el('[type=submit]',e.target);
+  if (button.disabled) return;
+  const data=Object.fromEntries(new FormData(e.target));data.title=data.title.trim();
+  if(!data.title||!Number.isFinite(Number(data.amount))||Number(data.amount)<=0){toast('Nhập nội dung và số tiền lớn hơn 0.');return;}
+  const editing=state.financeEditing;
+  const item=editing===null?null:state.transactions.find(t=>t.id===editing);
+  if (editing!==null && !item) {toast('Không tìm thấy giao dịch để sửa.');return;}
+  const updated={...item,...data,id:item?.id??Date.now(),amount:Number(data.amount),kind:state.financeKind};
+  const transactions=item?state.transactions.map(t=>t===item?updated:t):[updated,...state.transactions];
+  button.disabled=true;
+  try {
+    await persist({transactions}, () => {
+      const stillOpen=modalStack.at(-1)===modal;
+      if (stillOpen) {
+        state.financeMonth=updated.date.slice(0,7);
+        if (state.kind!=='all' && state.kind!==updated.kind) state.kind='all';
+        closeModal('financeModal');
+      }
+      render();
+      if (stillOpen) (els('[data-edit-transaction]').find(node=>node.dataset.editTransaction===String(updated.id)) || el('#openFinance')).focus();
+      toast(item?'Đã cập nhật giao dịch.':'Đã lưu giao dịch.');
+    });
+  } finally {
+    button.disabled=false;
+  }
 };
 el('#profileForm').onsubmit=async e=>{
   e.preventDefault();const form=e.target,button=el('button[type=submit]',form);button.disabled=true;
