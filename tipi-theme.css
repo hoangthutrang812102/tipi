@@ -120,7 +120,8 @@ button,select,input,textarea { -webkit-tap-highlight-color:transparent; }
 .outline-button.cancel-booking,.booking-cancelled { color:#a32940; }
 .outline-button.cancel-booking { border-color:#c98594; }
 .booking-cancelled { font-size:14px; font-weight:600; }
-#notificationList .agenda-item:last-child { border-bottom:1px solid var(--line); }
+#notificationList .agenda-item:last-child { border:1px solid var(--line); border-left:3px solid var(--pink-dark); }
+#notificationList .agenda-item.makeup:last-child { border-left-color:var(--expense); }
 #tomorrowAgenda .agenda-item:last-child { border:1px solid var(--line); border-left:3px solid var(--pink-dark); }
 #tomorrowAgenda .agenda-item.makeup:last-child { border-left-color:var(--expense); }
 .week-controls { gap:8px; font-size:13px; flex-wrap:wrap; }
