@@ -48,7 +48,7 @@ const state = {
   view:'overview',workspace:'all',filter:'all',kind:'all',mode:'week',range:'week',
   date:today(),weekStart:monday(today()),service:'nail',financeKind:'income',
   editing:null,images:[],imageLoading:false,bookingSession:0,
-  financeEditing:null,financeMonth:null
+  financeEditing:null,financeMonth:null,financePage:1,financeFilterKey:null
 };
 const matchesWorkspace = b => state.workspace === 'all' || b.service === state.workspace;
 const visibleBookings = () => state.bookings.filter(b => !b.cancelledAt && matchesWorkspace(b));
@@ -163,6 +163,7 @@ function initializeUI() {
   modal('detailModal','Chi tiết lịch hẹn','<div id="bookingDetail"></div>');
   modal('imageModal','Ảnh mẫu','<div id="imageStage" class="image-stage"></div><div class="image-controls"><button type="button" class="outline-button" data-image-step="-1" aria-label="Ảnh trước">‹</button><span id="imageCount" aria-live="polite"></span><button type="button" class="outline-button" data-image-step="1" aria-label="Ảnh tiếp theo">›</button></div>');
   el('.transactions-panel .segmented').insertAdjacentHTML('beforebegin','<select id="financeMonth" aria-label="Tháng thu chi"></select>');
+  el('#transactionTable').insertAdjacentHTML('afterend','<nav id="transactionPagination" class="transaction-pagination" aria-label="Phân trang giao dịch" hidden><span id="transactionRange" role="status"></span><div class="transaction-page-controls"><button type="button" class="outline-button" data-finance-page="-1">Trước</button><span id="transactionPage" aria-live="polite"></span><button type="button" class="outline-button" data-finance-page="1">Sau</button></div></nav>');
   modal('accountModal','Hồ sơ chủ tiệm','<div id="accountInfo"></div><button class="primary-button" id="editProfile">Chỉnh sửa hồ sơ</button>');
   modal('notificationModal','Lịch ngày mai','<div id="notificationList"></div>');
   modal('cancelledBookingsModal','Lịch đã hủy','<div id="cancelledBookingsList"></div>');
@@ -250,8 +251,14 @@ const transactionIcons = {
   delete:'<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>'
 };
 const transactionIcon = key => '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+transactionIcons[key]+'</svg>';
-function renderFinance() {
+const financePageSize=20;
+function renderFinance(focusTransaction=null) {
   const current=iso(today()).slice(0,7), month=state.financeMonth || current;
+  const filterKey=JSON.stringify([month,state.workspace,state.kind]);
+  if (filterKey!==state.financeFilterKey) {
+    state.financePage=1;
+    state.financeFilterKey=filterKey;
+  }
   const options=[...new Set([current,month,...state.transactions.map(t=>t.date.slice(0,7))])].sort().reverse();
   const picker=el('#financeMonth');
   picker.replaceChildren(...options.map(value=>new Option('Tháng '+value.slice(5)+'/'+value.slice(0,4),value)));
@@ -266,8 +273,20 @@ function renderFinance() {
   const currentTx=month===current?tx:visible.filter(t=>t.date.slice(0,7)===current);
   const monthIncome=total(currentTx,'income');
   el('#monthRevenue').textContent=money(monthIncome); el('#monthProfit').textContent=money(monthIncome-total(currentTx,'expense'));
-  const rows=tx.filter(t=>state.kind==='all'||t.kind===state.kind).sort((a,b)=>b.date.localeCompare(a.date));
-  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (rows.map(t=>`<div class="transaction-row"><div><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div>${shortDate(parseDate(t.date))}</div><div>${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="transaction-actions"><span class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</span><div class="transaction-tools"><button type="button" class="transaction-icon" data-edit-transaction="${esc(t.id)}" aria-label="Sửa giao dịch ${esc(t.title)}" title="Sửa">${transactionIcon('edit')}</button><button type="button" class="transaction-icon transaction-delete" data-delete-transaction="${esc(t.id)}" aria-label="Xóa giao dịch ${esc(t.title)}" title="Xóa">${transactionIcon('delete')}</button></div></div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng đã chọn.</p>');
+  const rows=tx.filter(t=>state.kind==='all'||t.kind===state.kind)
+    .sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id),'en',{numeric:true}));
+  const target=focusTransaction===null?-1:rows.findIndex(t=>String(t.id)===String(focusTransaction));
+  if (target>=0) state.financePage=Math.floor(target/financePageSize)+1;
+  const pages=Math.max(1,Math.ceil(rows.length/financePageSize));
+  state.financePage=Math.max(1,Math.min(state.financePage,pages));
+  const start=(state.financePage-1)*financePageSize;
+  const pageRows=rows.slice(start,start+financePageSize);
+  el('#transactionTable').innerHTML='<div class="transaction-row head"><div>NỘI DUNG</div><div>NGÀY</div><div>LOẠI</div><div>SỐ TIỀN</div></div>'+ (pageRows.map(t=>`<div class="transaction-row"><div class="transaction-content"><strong>${esc(t.title)}</strong><small>${esc(t.note)} · ${esc(services[t.service]||'Chưa phân loại')}</small></div><div class="transaction-date"><time datetime="${esc(t.date)}">${shortDate(parseDate(t.date))}</time></div><div class="transaction-kind">${t.kind==='income'?'Khoản thu':'Khoản chi'}</div><div class="transaction-actions"><span class="amount-${t.kind}">${t.kind==='income'?'+':'-'}${money(t.amount)}</span><div class="transaction-tools"><button type="button" class="transaction-icon" data-edit-transaction="${esc(t.id)}" aria-label="Sửa giao dịch ${esc(t.title)}" title="Sửa">${transactionIcon('edit')}</button><button type="button" class="transaction-icon transaction-delete" data-delete-transaction="${esc(t.id)}" aria-label="Xóa giao dịch ${esc(t.title)}" title="Xóa">${transactionIcon('delete')}</button></div></div></div>`).join('')||'<p>Chưa có giao dịch phù hợp trong tháng đã chọn.</p>');
+  el('#transactionPagination').hidden=rows.length<=financePageSize;
+  el('#transactionRange').textContent=(rows.length?start+1:0)+'–'+Math.min(start+financePageSize,rows.length)+' / '+rows.length+' giao dịch';
+  el('#transactionPage').textContent='Trang '+state.financePage+'/'+pages;
+  el('[data-finance-page="-1"]').disabled=state.financePage===1;
+  el('[data-finance-page="1"]').disabled=state.financePage===pages;
   els('[data-kind-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.kindFilter===state.kind);b.setAttribute('aria-pressed',b.dataset.kindFilter===state.kind);});
   const bs=visibleBookings();
   el('#weekBookings').textContent=bs.filter(b=>within(b.date,period(today(),'week'))).length+' lịch';
@@ -498,6 +517,15 @@ document.addEventListener('click', e=>{
   else if(b.dataset.day) {state.date=parseDate(b.dataset.day);state.weekStart=monday(state.date);state.mode='day';setView('calendar');}
   else if(b.dataset.mode) {state.mode=b.dataset.mode;renderCalendar();}
   else if(b.dataset.kindFilter) {state.kind=b.dataset.kindFilter;renderFinance();}
+  else if(b.hasAttribute('data-finance-page')) {
+    if (b.disabled) return;
+    state.financePage+=Number(b.dataset.financePage);
+    renderFinance();
+    const table=el('#transactionTable');
+    table.tabIndex=-1;
+    table.focus({preventScroll:true});
+    table.scrollIntoView?.({block:'start',behavior:'auto'});
+  }
   else if(b.hasAttribute('data-delete-transaction')) void deleteTransaction(b);
   else if(b.hasAttribute('data-edit-transaction')) {
     const item=state.transactions.find(t=>String(t.id)===b.dataset.editTransaction);
@@ -632,6 +660,7 @@ el('#financeForm').onsubmit=async e=>{
         closeModal('financeModal');
       }
       render();
+      if (stillOpen) renderFinance(updated.id);
       if (stillOpen) (els('[data-edit-transaction]').find(node=>node.dataset.editTransaction===String(updated.id)) || el('#openFinance')).focus();
       toast(item?'Đã cập nhật giao dịch.':'Đã lưu giao dịch.');
     });
